@@ -5,6 +5,7 @@ import tempfile
 import pdb
 import difflib
 import pandas as pd
+from prettytable import PrettyTable 
 
 if (len(sys.argv) < 3) or (len(sys.argv) > 4):
     print("Usage: python compareScreens.py <filename1> <filename2>\n")
@@ -109,7 +110,7 @@ def printRelevantDiffLines(content1, content2):
     
     for diffLine in differences:
 
-        jplMatch = re.match(r"^[\?\-\+] .*", diffLine)
+        jplMatch = re.match(r"^[\-\+] .*", diffLine)
         if (jplMatch):
             print (diffLine)
             unique = False
@@ -173,8 +174,12 @@ def compareFields(fieldSet1, fieldSet2):
     # Now, go through all the fields.
     # First check if the fieldSet maps are the same.
 
+
     print("---------------\n")
     print("Named Field Comparisons:\n")
+    # Specify the Column Names while initializing the Table 
+    myTable = PrettyTable(["Screens", screenName1, screenName2]) 
+    myTable.hrules = True
 
     # Check the field Lists are the same
     keys1 = fieldSet1.keys()
@@ -182,29 +187,31 @@ def compareFields(fieldSet1, fieldSet2):
 
     if (keys1 == keys2):
         print("No New fields added or deleted\n")
+        myTable.add_row(["New Fields", "None", "None"]) 
         commonKeys = keys1
         
     else:
         commonKeys = list(set(keys1).intersection(keys2))
         keys1Only = list(set(keys1) - set(keys2))
         keys2Only = list(set(keys2) - set(keys1))
+        
+        for fieldNameS1 in iter(sorted(keys1Only)):
+            myTable.add_row(["Unique Field", fieldNameS1, ""]) 
 
-        print("Fields Only in Screen 1: " + ", ".join(keys1Only))
-        print("Fields Only in Screen 2: " + ", ".join(keys2Only))
-        print("")
-    commonFields = commonKeys
-    print ("-----\n")
+        for fieldNameS2 in iter(sorted(keys2Only)):
+            myTable.add_row(["Unique Field", "", fieldNameS2]) 
+
+        #print("Fields Only in Screen 1: " + ", ".join(keys1Only))
+        #print("Fields Only in Screen 2: " + ", ".join(keys2Only))
+        #print("")
+
+#    print ("-----\n")
 
     # Now, print differences in common fields
 
-    print("Differences in Common Fields:\n")
-    from prettytable import PrettyTable 
-
-    # Specify the Column Names while initializing the Table 
-    myTable = PrettyTable(["Common Fields", screenName1, screenName2]) 
+    #print("Differences in Common Fields:\n")
 
     # Add rows 
-    myTable.add_row(["Leanord", "X", "B", "91.2 %"]) 
 
     unique = True
     
@@ -217,7 +224,7 @@ def compareFields(fieldSet1, fieldSet2):
 
         unique = False
         
-        print ("Field different for: " + fieldName + "\n")
+        #print ("Field different for: " + fieldName + "\n")
 
         truediffs = printRelevantDiffLines(fieldSet1[fieldName], fieldSet2[fieldName])
         # truediffs will have entries - is screen1 + screen 2
@@ -225,16 +232,20 @@ def compareFields(fieldSet1, fieldSet2):
         scrn1diff = []
         scrn2diff = []
         for x in truediffs:
-          isscrn1 = re.match(r"^[\?\-] .*", x)
-        if (isscrn1):
-            scrn1diff.append(x)
-        else:    
-            scrn2diff.append(x)
-
-        myTable.add_row([fieldName, scrn1diff, scrn2diff]) 
+            isscrn1 = re.match(r"^[\-] .*", x)
+            if (isscrn1):
+                scrn1diff.append(x)
+                scrn2diff.append("")
+            else:    
+                scrn2diff.append(x)
+                scrn1diff.append("")
+        scrn1diffout = "".join(scrn1diff)
+        scrn2diffout = "".join(scrn2diff)
+        myTable.add_row([fieldName, scrn1diffout, scrn2diffout]) 
         
     if (unique):
-        print("No Differences in Common Fields\n")
+        #print("No Differences in Common Fields\n")
+        myTable.add_row(["Common Fields", "None", "None"]) 
 
     print(myTable)    
     return
