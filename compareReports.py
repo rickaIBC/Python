@@ -18,8 +18,8 @@ else:
         defect_enh_id =sys.argv[1]
         screenName = sys.argv[2]
     else:
-        print("Usage: python compareScreens.py <Defect/Enhancment #> <screenname.jam>\n")
-        print("if Screenname is blank it will compare ALL screens in directory")
+        print("Usage: python compareReports.py <Defect/Enhancment #> <reportname.jam>\n")
+        print("if Reportname is blank it will compare ALL Reports in directory")
         sys.exit()
 
 # Uncommenting the pdb line opens the debugger in the command line
@@ -34,6 +34,7 @@ def readScreen(screenName):
     curFieldName = ""
     fieldSet = {}
     jplText = []
+    rptText = []
     numLinesScreenFile = 0
     
     with open(screenName, "r") as screenFile:
@@ -43,23 +44,41 @@ def readScreen(screenName):
 
             numLinesScreenFile += 1
 
-            if (line == ""):
+            if (line == "" ):
                 break
+            if (line == '\n'):
+                continue
 
             # Read in the screen.
             # Parse out and store the JPLTEXT
             # Parse out and store the fields.
 
-            screenMatch = re.match(r"\s*[S]:(\S+)", line)
+            screenMatch = re.match(r"\s*[R]:(\S+)", line)
             jplMatch = re.match(r"\s*JPLTEXT=(.*)", line)
             fieldMatch = re.match(r"\s*[GLFBYT]:(\S*)\s*$", line)
+            rptMatch = re.match(r"\s*RW-SCRIPT =(.*)", line)
 
             # If this is an excluded field line, then just skip this line
             if (stripExtraneousFieldLines(line) is None):
                 continue
-            
+
+            if (rptMatch):
+                # Read until END-SCRIPT
+                rptText.append(line.strip(' '))
+                while True:
+                    rptline = screenFile.readline().lstrip(' ')
+                    numLinesScreenFile += 1
+                    if (line == ""):
+                        continue
+                    rptText.append(rptline.strip(' '))
+                    endrptMatch = re.match(r"\s*END-SCRIPT(.*)", rptline)
+                    if (endrptMatch):
+                        rptText.append(rptline.strip(' '))
+                        break
+
+
             if (screenMatch):
-                curField.append(line)
+ #               curField.append(line)
                 inScreenText = True
 
             elif (jplMatch):
@@ -105,7 +124,7 @@ def readScreen(screenName):
             if (inFieldText or inScreenText):
                 curField.append(line)
                 
-    return jplText, fieldSet
+    return jplText, fieldSet, rptText
 
 def printRelevantDiffLines(content1, content2):
     diffObject = difflib.Differ()
@@ -143,21 +162,27 @@ def stripExtraneousFieldLines(fieldLine):
         return None
     
     ## Exclude all PI lines like the following:
-    # PI(voff)=18.50
-    # PI(hoff)=23.00
-    # PI(save-hoff)=138
-    # PI(save-voff)=259
-    # PI(save-width)=18
-    # PI(save-height)=14
-    # PI(halign)=0
-    # PI(valign)=.5
-    # PI(font)=Times New Roman-10-bold
+#   PI(gridh)=0.1458333284in
+#   PI(gridw)=0.0625000000in
+#   PI(height)=24.57
+#   PI(save-gridh)=14
+#   PI(save-gridw)=6
+#   PI(view-height)=24.57
+#   PI(view-width)=311.83
+#   PI(width)=1400
+#   EDITED-BY=3
 
     ## Note that the PI(save-length) paramaeter has meaning
     # (shows actual display length in html, rather than character limit as in LENGTH=
     # so it is no excluded
 
     if (re.match(r"\s*+PI\((voff|hoff|save-hoff|save-voff|save-width|save-height|halign|valign|font)\)=.*", fieldLine)):
+        return None
+    
+    if (re.match(r"\s*+PI\((gridh|gridw|height|save-gridh|save-gridw|view-height|view-width|width|font)\)=.*", fieldLine)):
+        return None
+
+    if (re.match(r"\s*JPLTEXT=.*//.*", fieldLine)):
         return None
 
     return fieldLine
@@ -186,6 +211,32 @@ def compareJplPandas(jplText1, jplText2):
         scrn1diffout = "\n".join(scrn1diff)
         scrn2diffout = "\n".join(scrn2diff)
         return(["JPL Text", scrn1diffout, scrn2diffout]) 
+
+    return
+
+def compareRptPandas(rptText1, rptText2):
+
+    # Go through JPL first:
+    #print("Jpl Comparison:")
+    #print("---------------\n")
+    truediffs = printRelevantDiffLines(rptText1, rptText2)
+    if (truediffs is None):
+        #print ("JPL is identical\n")
+        return(["REPORT Script", "Same", "Same"]) 
+    else:
+        rpt1diff = []
+        rpt2diff = []
+        for x in truediffs:
+            isscrn1 = re.match(r"^[\-] .*", x)
+            if (isscrn1):
+                rpt1diff.append(x)
+                rpt2diff.append("")
+            else:    
+                rpt2diff.append(x)
+                rpt1diff.append("")
+        rpt1diffout = "\n".join(rpt1diff)
+        rpt2diffout = "\n".join(rpt2diff)
+        return(["REPORT Script", rpt1diffout, rpt2diffout]) 
 
     return
 
@@ -309,20 +360,18 @@ def create_index_html(repo_path):
         f.write(html_content)
     print("index.html file has been created successfully!")
 
-
-
-
-
-
+#---------------------------------------------------------------------------------------------------
 # PROGRAM START (after def's and variables above)
 config = configparser.ConfigParser()
 
 # Add a section
 config.read('config.ini')
 
-outputBaseDirectory = config['CompareScreen']['outputPath']
-inputBaseDirectory=config['CompareScreen']['inputBaseDirectory']
+outputBaseDirectory = config['CompareReport']['outputPath']
+inputBaseDirectory=config['CompareReport']['inputBaseDirectory']
 # Create the directory
+if defect_enh_id.startswith("TEST"):
+    outputDir = os.path.join(outputBaseDirectory,"Testing",defect_enh_id)
 if defect_enh_id.startswith("ENH"):
     outputDir = os.path.join(outputBaseDirectory,"Enhancements",defect_enh_id)
 if defect_enh_id.startswith("DEF"):
@@ -340,7 +389,7 @@ except OSError as e:
         sys.exit
 
 
-extension = ".jam.asc" 
+extension = ".jrw.asc" 
 files = get_files_with_extension(inputDir, extension)
 print(files)
 
@@ -360,19 +409,20 @@ for fname in files:
     if not os.path.exists(pathName1) and os.path.exists(pathName2):
         continue
     fcounter+= 1
-    jplText1, fieldSet1 = readScreen(pathName1)
-    jplText2, fieldSet2 = readScreen(pathName2)
+    jplText1, fieldSet1, rptText1 = readScreen(pathName1)
+    jplText2, fieldSet2, rptText2 = readScreen(pathName2)
     jpldata = [[ str(len(jplText1)),str(len(jplText2))]]
     flddata = [[ str(len(fieldSet1)),str(len(fieldSet2))]]
     
     pjpldiffs = compareJplPandas(jplText1, jplText2)
     pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
+    prptdiffs = compareRptPandas(rptText1, rptText2)
 
     newflddata = pflddiffs[0]
     technologies = ({
-        'Screen':["JPL Lines","Num Fields","JPL Text"],
-        screenName1 :[str(len(jplText1)),str(len(fieldSet1)),pjpldiffs[1]],
-        screenName2 :[str(len(jplText2)),str(len(fieldSet1)),pjpldiffs[2]]
+        'Screen':["JPL Lines","Num Fields","JPL Text","REPORT Script"],
+        screenName1 :[str(len(jplText1)),str(len(fieldSet1)),pjpldiffs[1],prptdiffs[1]],
+        screenName2 :[str(len(jplText2)),str(len(fieldSet1)),pjpldiffs[2],prptdiffs[2]]
                 })
     df = pd.DataFrame(technologies)
 
@@ -416,7 +466,7 @@ for fname in files:
 #print("")
 
 
-print("Completed Screen Compare - Files processed="+str(fcounter)+"\n")
+print("Completed Reports Compare - Files processed="+str(fcounter)+"\n")
 # RawFiles -- for debugging or maybe examination.
 
 #print("RawFile1: " + printRawScreenFile(jplText1, fieldSet1))
