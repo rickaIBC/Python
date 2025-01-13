@@ -8,6 +8,8 @@ import difflib
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 import os
+from colorama import Fore, Back, Style
+
 
 
 if (len(sys.argv) == 2) :
@@ -107,6 +109,48 @@ def readScreen(screenName):
                 
     return jplText, fieldSet
 
+def readScreenJPL(screenName):
+
+    jplText = []
+    numLinesScreenFile = 0
+    
+    with open(screenName, "r") as screenFile:
+
+        while True:
+            line = screenFile.readline().lstrip(' ')
+
+            numLinesScreenFile += 1
+
+            if (line == ""):
+                break
+
+            # Read in the screen.
+            # When we find PI we know the JPL has completed
+
+            jplMatch = re.match(r"\s*JPLTEXT=(.*)", line)
+            endMatch = re.match(r"\s*PI\s*", line)
+
+            # If this is an excluded field line, then just skip this line
+            if (stripExtraneousFieldLines(line) is None):
+                continue
+
+            if (jplMatch):
+                inJPLText = True
+                jplText.append(line.strip(' '))
+                while True:
+                    line = screenFile.readline().lstrip(' ')
+
+                    endMatch = re.match(r"\s*PI\s*", line)
+                    if (endMatch):
+                        #thats it 
+                        return jplText
+                    result = re.sub(r"^\s*JPLTEXT=\s*", "", line)
+                    jplText.append(result.strip(' '))
+                
+    return jplText
+
+
+
 def printRelevantDiffLines(content1, content2):
     diffObject = difflib.Differ()
     differences = list(diffObject.compare(content1, content2))
@@ -189,6 +233,23 @@ def compareJplPandas(jplText1, jplText2):
 
     return
 
+import difflib
+
+def compare_jpl_files(jplText1, jplText2, fname):
+    file1 = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
+    file1.write("".join(jplText1))
+    file1.write('\n')
+    file2 = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
+    file2.write("".join(jplText2))
+    file2.write('\n')
+    file1.close
+    file2.close
+    with open(file1.name) as f1, open(file2.name) as f2:
+        differ = difflib.HtmlDiff(wrapcolumn=100)
+        html = differ.make_file(f1.readlines(), f2.readlines())
+
+    with open(fname, 'w') as f:
+        f.write(html)
 
 
 def compareFieldsPandas(fieldSet1, fieldSet2):
@@ -252,18 +313,6 @@ def compareFieldsPandas(fieldSet1, fieldSet2):
 
     return resultArr
 
-def printRawScreenFile(jplText, fieldSet):
-
-    screenRawFile = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
-    screenRawFile.write('\n'.join(fieldSet["__internalScreen__"]))
-    screenRawFile.write('\n')
-    screenRawFile.write('\n'.join(jplText))
-    screenRawFile.write('\n')
-    for fieldName in iter(sorted(fieldSet.keys())):
-        screenRawFile.write(''.join(fieldSet[fieldName]))
-        screenRawFile.write('\n')
-        
-    return screenRawFile.name
 
 def get_files_with_extension(directory, extension):
     file_list = []
@@ -309,24 +358,29 @@ def create_index_html(repo_path):
         f.write(html_content)
     print("index.html file has been created successfully!")
 
-
-
-
-
-
+# ---------------------------------------------------------------------------------------
 # PROGRAM START (after def's and variables above)
 config = configparser.ConfigParser()
 
 # Add a section
 config.read('config.ini')
-
+#get all the ini data
 outputBaseDirectory = config['CompareScreen']['outputPath']
 inputBaseDirectory=config['CompareScreen']['inputBaseDirectory']
-# Create the directory
-if defect_enh_id.startswith("ENH"):
+enhancementsDirectoryStart=config['CompareScreen']['enhancementsDirectoryStart']
+defectsDirectoryStart=config['CompareScreen']['defectsDirectoryStart']
+
+asciiOriginalExtension=config['CompareScreen']['asciiOriginalExtension']
+asciiModifiedExtension=config['CompareScreen']['asciiModifiedExtension']
+
+# Create the docs directory if its Enhancement or Defect
+if defect_enh_id.startswith("TEST"):
+    outputDir = os.path.join(outputBaseDirectory,"Testing",defect_enh_id)
+if defect_enh_id.startswith(enhancementsDirectoryStart):
     outputDir = os.path.join(outputBaseDirectory,"Enhancements",defect_enh_id)
-if defect_enh_id.startswith("DEF"):
+if defect_enh_id.startswith(defectsDirectoryStart):
     outputDir = os.path.join(outputBaseDirectory,"Defects",defect_enh_id)
+
 inputDir = inputBaseDirectory+"/"+defect_enh_id
 
 
@@ -340,39 +394,48 @@ except OSError as e:
         sys.exit
 
 
-extension = ".jam.asc" 
-files = get_files_with_extension(inputDir, extension)
-print(files)
+files = get_files_with_extension(inputDir, asciiModifiedExtension)
 
 if screenName != "":
     # just use filename
     files = [screenName + ".asc"]
-
     # do the loop
+
+if (len(files) == 0) :
+    print(Fore.RED + "No Screen Files to compare!" + Style.RESET_ALL)
+    sys.exit
+
 fcounter = 0
 for fname in files:
-    screenName1 = fname + ".bak"
+    screenName1 = fname + asciiOriginalExtension
     screenName2 = fname 
 
     pathName1 = inputDir +'/' + screenName1
     pathName2 = inputDir +'/' + screenName2
     # check if files exist if not ignore them.
     if not os.path.exists(pathName1) and os.path.exists(pathName2):
+        print(Fore.RED + "No ASCII Files to compare! ",pathName1," : " , pathName2 + Style.RESET_ALL)
         continue
     fcounter+= 1
     jplText1, fieldSet1 = readScreen(pathName1)
     jplText2, fieldSet2 = readScreen(pathName2)
     jpldata = [[ str(len(jplText1)),str(len(jplText2))]]
     flddata = [[ str(len(fieldSet1)),str(len(fieldSet2))]]
-    
+    jplRawText1 = readScreenJPL(pathName1)
+    jplRawText2 = readScreenJPL(pathName2)
+
+    jpldiff=fname +'.jpl.html'
+    link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
+    foutpath = outputDir + "\\" + jpldiff
+    compare_jpl_files(jplRawText1, jplRawText2,foutpath)
     pjpldiffs = compareJplPandas(jplText1, jplText2)
     pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
 
     newflddata = pflddiffs[0]
     technologies = ({
-        'Screen':["JPL Lines","Num Fields","JPL Text"],
-        screenName1 :[str(len(jplText1)),str(len(fieldSet1)),pjpldiffs[1]],
-        screenName2 :[str(len(jplText2)),str(len(fieldSet1)),pjpldiffs[2]]
+        'Screen':["JPL Lines","Num Fields"],
+        screenName1 :[str(len(jplText1)),str(len(fieldSet1))],
+        screenName2 :[str(len(jplText2)),str(len(fieldSet1))]
                 })
     df = pd.DataFrame(technologies)
 
@@ -390,7 +453,7 @@ for fname in files:
     html_table = html_table.replace('dataframe', 'table table-striped ')
     html_table = html_table.replace('">', '" style="width:100%">')
 
-    print (html_table)
+    #print (html_table)
     # Load the template environment
     env = Environment(loader=FileSystemLoader('./'))
     template = env.get_template('index.html')
@@ -400,32 +463,13 @@ for fname in files:
     #    file_content = f.read()
 
     # Render the template with the file content
-    rendered_html = template.render(content=html_table)
+    rendered_html = template.render(content=html_table,jpllink=jpldiff)
 
     # Save the rendered HTML to a file
     with open(outputDir+'/'+ fname +'.html', 'w') as f:
         f.write(rendered_html)
 
-
-#jplFile1 = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
-#jplFile1.write('\n'.join(jplText1))
-#print("JPL TempFile1: " + jplFile1.name)
-#jplFile2 = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
-#jplFile2.write('\n'.join(jplText2))
-#print("JPL TempFile2: " + jplFile2.name)
-#print("")
-
-
 print("Completed Screen Compare - Files processed="+str(fcounter)+"\n")
-# RawFiles -- for debugging or maybe examination.
-
-#print("RawFile1: " + printRawScreenFile(jplText1, fieldSet1))
-#print("RawFile2: " + printRawScreenFile(jplText2, fieldSet2))
-
-# Create a DataFrame for pandas
-# Replace the opening <table> tag to add your custom id and remove any default 'dataframe' class
-
-
 
 # Usage
 create_index_html(outputDir)

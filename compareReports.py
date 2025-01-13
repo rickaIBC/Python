@@ -374,7 +374,7 @@ if defect_enh_id.startswith("TEST"):
     outputDir = os.path.join(outputBaseDirectory,"Testing",defect_enh_id)
 if defect_enh_id.startswith("ENH"):
     outputDir = os.path.join(outputBaseDirectory,"Enhancements",defect_enh_id)
-if defect_enh_id.startswith("DEF"):
+if defect_enh_id.startswith("DFCT"):
     outputDir = os.path.join(outputBaseDirectory,"Defects",defect_enh_id)
 inputDir = inputBaseDirectory+"/"+defect_enh_id
 
@@ -477,8 +477,8 @@ print("Completed Reports Compare - Files processed="+str(fcounter)+"\n")
 
 
 
-# Usage
-create_index_html(outputDir)
+# Usage Not needed with Github Pages
+#create_index_html(outputDir)
 
 
 
