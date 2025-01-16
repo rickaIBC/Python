@@ -8,7 +8,7 @@ import difflib
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 import os
-
+from colorama import Fore, Back, Style
 
 if (len(sys.argv) == 2) :
     defect_enh_id =sys.argv[1]
@@ -126,6 +126,47 @@ def readScreen(screenName):
                 
     return jplText, fieldSet, rptText
 
+def readScreenJPL(screenName):
+
+    jplText = []
+    numLinesScreenFile = 0
+    
+    with open(screenName, "r") as screenFile:
+
+        while True:
+            line = screenFile.readline().lstrip(' ')
+
+            numLinesScreenFile += 1
+
+            if (line == ""):
+                break
+
+            # Read in the screen.
+            # When we find PI we know the JPL has completed
+
+            jplMatch = re.match(r"\s*JPLTEXT=(.*)", line)
+            endMatch = re.match(r"\s*(RW|PI|DB)\s*", line)
+
+            # If this is an excluded field line, then just skip this line
+            if (stripExtraneousFieldLines(line) is None):
+                continue
+
+            if (jplMatch):
+                inJPLText = True
+                jplText.append(line.strip(' '))
+                while True:
+                    line = screenFile.readline().lstrip(' ')
+
+                    endMatch = re.match(r"\s*(RW|PI|DB)\s*", line)
+                    if (endMatch):
+                        #thats it 
+                        return jplText
+                    result = re.sub(r"^\s*JPLTEXT=\s*", "", line)
+                    jplText.append(result.strip(' '))
+                
+    return jplText
+
+
 def printRelevantDiffLines(content1, content2):
     diffObject = difflib.Differ()
     differences = list(diffObject.compare(content1, content2))
@@ -196,23 +237,11 @@ def compareJplPandas(jplText1, jplText2):
     truediffs = printRelevantDiffLines(jplText1, jplText2)
     if (truediffs is None):
         #print ("JPL is identical\n")
-        return(["JPL", "Same", "Same"]) 
+        return False
     else:
-        scrn1diff = []
-        scrn2diff = []
-        for x in truediffs:
-            isscrn1 = re.match(r"^[\-] .*", x)
-            if (isscrn1):
-                scrn1diff.append(x)
-                scrn2diff.append("")
-            else:    
-                scrn2diff.append(x)
-                scrn1diff.append("")
-        scrn1diffout = "\n".join(scrn1diff)
-        scrn2diffout = "\n".join(scrn2diff)
-        return(["JPL Text", scrn1diffout, scrn2diffout]) 
+        return True
 
-    return
+    
 
 def compareRptPandas(rptText1, rptText2):
 
@@ -240,7 +269,21 @@ def compareRptPandas(rptText1, rptText2):
 
     return
 
+def compare_jpl_files(jplText1, jplText2, fname):
+    with open('text1.txt', 'w+') as file1:
+        file1.writelines([i for i in jplText1])
+    with open('text2.txt', 'w+') as file2:
+        file2.writelines([i for i in jplText2])
+        
+    with open('text1.txt') as file1, open('text2.txt') as file2:
+        differ = difflib.HtmlDiff(wrapcolumn=100)
+        html = differ.make_file(file1.readlines(), file2.readlines())
 
+    with open(fname, 'w') as f:
+        f.write(html)
+
+    os.remove("text1.txt")
+    os.remove("text2.txt")
 
 def compareFieldsPandas(fieldSet1, fieldSet2):
     # Now, go through all the fields.
@@ -261,11 +304,14 @@ def compareFieldsPandas(fieldSet1, fieldSet2):
         keys1Only = list(set(keys1) - set(keys2))
         keys2Only = list(set(keys2) - set(keys1))
         
-        for fieldNameS1 in iter(sorted(keys1Only)):
-            resultArr.append(["Unique Field", "".join(fieldNameS1), ""]) 
+#        for fieldNameS1 in iter(sorted(keys1Only)):
+#            resultArr.append(["Field ", "".join(fieldNameS1), ""]) 
 
-        for fieldNameS2 in iter(sorted(keys2Only)):
-            resultArr.append(["Unique Field", "", "".join(fieldNameS2)]) 
+#        for fieldNameS2 in iter(sorted(keys2Only)):
+#            resultArr.append(["Field - only in screen", "", "".join(fieldNameS2)]) 
+
+        resultArr.append(["Unique Fields ", "\n".join(keys1Only),"\n".join(keys2Only)]) 
+
 #        print("Fields Only in Screen 1: " + ", ".join(keys1Only))
 #        print("Fields Only in Screen 2: " + ", ".join(keys2Only))
 #        print("")
@@ -369,15 +415,22 @@ config.read('config.ini')
 
 outputBaseDirectory = config['CompareReport']['outputPath']
 inputBaseDirectory=config['CompareReport']['inputBaseDirectory']
+enhancementsDirectoryStart=config['CompareReport']['enhancementsDirectoryStart']
+defectsDirectoryStart=config['CompareReport']['defectsDirectoryStart']
+
+asciiOriginalExtension=config['CompareReport']['asciiOriginalExtension']
+asciiModifiedExtension=config['CompareReport']['asciiModifiedExtension']
+
+
 # Create the directory
 if defect_enh_id.startswith("TEST"):
     outputDir = os.path.join(outputBaseDirectory,"Testing",defect_enh_id)
-if defect_enh_id.startswith("ENH"):
+if defect_enh_id.startswith(enhancementsDirectoryStart):
     outputDir = os.path.join(outputBaseDirectory,"Enhancements",defect_enh_id)
-if defect_enh_id.startswith("DFCT"):
+if defect_enh_id.startswith(defectsDirectoryStart):
     outputDir = os.path.join(outputBaseDirectory,"Defects",defect_enh_id)
-inputDir = inputBaseDirectory+"/"+defect_enh_id
 
+inputDir = inputBaseDirectory+"/"+defect_enh_id
 
 try:
     os.makedirs(outputDir)
@@ -389,40 +442,54 @@ except OSError as e:
         sys.exit
 
 
-extension = ".jrw.asc" 
-files = get_files_with_extension(inputDir, extension)
-print(files)
+files = get_files_with_extension(inputDir, asciiModifiedExtension)
 
 if screenName != "":
     # just use filename
-    files = [screenName + ".asc"]
+    files = [screenName + asciiModifiedExtension]
+
+if (len(files) == 0) :
+    print(Fore.RED + "No Report Files to compare!" + Style.RESET_ALL)
+    sys.exit
+
 
     # do the loop
 fcounter = 0
 for fname in files:
-    screenName1 = fname + ".bak"
+    screenName1 = fname + asciiOriginalExtension
     screenName2 = fname 
 
     pathName1 = inputDir +'/' + screenName1
     pathName2 = inputDir +'/' + screenName2
     # check if files exist if not ignore them.
     if not os.path.exists(pathName1) and os.path.exists(pathName2):
+        print(Fore.RED + "No ASCII Files to compare! ",pathName1," : " , pathName2 + Style.RESET_ALL)
         continue
     fcounter+= 1
     jplText1, fieldSet1, rptText1 = readScreen(pathName1)
     jplText2, fieldSet2, rptText2 = readScreen(pathName2)
     jpldata = [[ str(len(jplText1)),str(len(jplText2))]]
     flddata = [[ str(len(fieldSet1)),str(len(fieldSet2))]]
-    
+    jplRawText1 = readScreenJPL(pathName1)
+    jplRawText2 = readScreenJPL(pathName2)
+
     pjpldiffs = compareJplPandas(jplText1, jplText2)
+    if (pjpldiffs):
+        jpldiff=fname +'.jpl.html'
+        link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
+        foutpath = outputDir + "\\" + jpldiff
+        compare_jpl_files(jplRawText1, jplRawText2,foutpath)
+    else:
+        jpldiff=""
+
     pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
     prptdiffs = compareRptPandas(rptText1, rptText2)
 
     newflddata = pflddiffs[0]
     technologies = ({
-        'Screen':["JPL Lines","Num Fields","JPL Text","REPORT Script"],
-        screenName1 :[str(len(jplText1)),str(len(fieldSet1)),pjpldiffs[1],prptdiffs[1]],
-        screenName2 :[str(len(jplText2)),str(len(fieldSet1)),pjpldiffs[2],prptdiffs[2]]
+        'Screen':["JPL Lines","Num Fields","REPORT Script"],
+        screenName1 :[str(len(jplText1)),str(len(fieldSet1)),prptdiffs[1]],
+        screenName2 :[str(len(jplText2)),str(len(fieldSet1)),prptdiffs[2]]
                 })
     df = pd.DataFrame(technologies)
 
@@ -450,8 +517,7 @@ for fname in files:
     #    file_content = f.read()
 
     # Render the template with the file content
-    rendered_html = template.render(content=html_table)
-
+    rendered_html = template.render(content=html_table,jpllink=jpldiff)
     # Save the rendered HTML to a file
     with open(outputDir+'/'+ fname +'.html', 'w') as f:
         f.write(rendered_html)
@@ -477,8 +543,8 @@ print("Completed Reports Compare - Files processed="+str(fcounter)+"\n")
 
 
 
-# Usage Not needed with Github Pages
-#create_index_html(outputDir)
+# Usage needed with Github Pages
+create_index_html(outputDir)
 
 
 

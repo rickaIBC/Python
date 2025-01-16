@@ -215,42 +215,40 @@ def compareJplPandas(jplText1, jplText2):
     truediffs = printRelevantDiffLines(jplText1, jplText2)
     if (truediffs is None):
         #print ("JPL is identical\n")
-        return(["JPL", "Same", "Same"]) 
+        return False
     else:
-        scrn1diff = []
-        scrn2diff = []
-        for x in truediffs:
-            isscrn1 = re.match(r"^[\-] .*", x)
-            if (isscrn1):
-                scrn1diff.append(x)
-                scrn2diff.append("")
-            else:    
-                scrn2diff.append(x)
-                scrn1diff.append("")
-        scrn1diffout = "\n".join(scrn1diff)
-        scrn2diffout = "\n".join(scrn2diff)
-        return(["JPL Text", scrn1diffout, scrn2diffout]) 
+        return True
+#        scrn1diff = []
+#        scrn2diff = []
+#        for x in truediffs:
+#            isscrn1 = re.match(r"^[\-] .*", x)
+#            if (isscrn1):
+#                scrn1diff.append(x)
+#                scrn2diff.append("")
+#            else:    
+#                scrn2diff.append(x)
+#                scrn1diff.append("")
+#        scrn1diffout = "\n".join(scrn1diff)
+#        scrn2diffout = "\n".join(scrn2diff)
+#        return(["JPL Text", scrn1diffout, scrn2diffout]) 
 
-    return
-
-import difflib
+ 
 
 def compare_jpl_files(jplText1, jplText2, fname):
-    file1 = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
-    file1.write("".join(jplText1))
-    file1.write('\n')
-    file2 = tempfile.NamedTemporaryFile(mode='w+t', delete=False)
-    file2.write("".join(jplText2))
-    file2.write('\n')
-    file1.close
-    file2.close
-    with open(file1.name) as f1, open(file2.name) as f2:
+    with open('text1.txt', 'w+') as file1:
+        file1.writelines([i for i in jplText1])
+    with open('text2.txt', 'w+') as file2:
+        file2.writelines([i for i in jplText2])
+        
+    with open('text1.txt') as file1, open('text2.txt') as file2:
         differ = difflib.HtmlDiff(wrapcolumn=100)
-        html = differ.make_file(f1.readlines(), f2.readlines())
+        html = differ.make_file(file1.readlines(), file2.readlines())
 
     with open(fname, 'w') as f:
         f.write(html)
 
+    os.remove("text1.txt")
+    os.remove("text2.txt")
 
 def compareFieldsPandas(fieldSet1, fieldSet2):
     # Now, go through all the fields.
@@ -398,7 +396,7 @@ files = get_files_with_extension(inputDir, asciiModifiedExtension)
 
 if screenName != "":
     # just use filename
-    files = [screenName + ".asc"]
+    files = [screenName + asciiModifiedExtension]
     # do the loop
 
 if (len(files) == 0) :
@@ -424,11 +422,16 @@ for fname in files:
     jplRawText1 = readScreenJPL(pathName1)
     jplRawText2 = readScreenJPL(pathName2)
 
-    jpldiff=fname +'.jpl.html'
-    link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
-    foutpath = outputDir + "\\" + jpldiff
-    compare_jpl_files(jplRawText1, jplRawText2,foutpath)
     pjpldiffs = compareJplPandas(jplText1, jplText2)
+    if (pjpldiffs):
+        jpldiff=fname +'.jpl.html'
+        link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
+        foutpath = outputDir + "\\" + jpldiff
+        compare_jpl_files(jplRawText1, jplRawText2,foutpath)
+    else:
+        jpldiff=""
+    
+  
     pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
 
     newflddata = pflddiffs[0]

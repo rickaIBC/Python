@@ -28,10 +28,16 @@
       topStart: {
         buttons: [
             {
-                text: 'JPL Link',
+                text: function (e, dt, node, config) {
+                        var hiddenUrl = document.getElementById('jpllink').value;
+                        return hiddenUrl === "" ? 'No JPL Differences' : 'JPL Link';
+                    },
                 action: function (e, dt, node, config) {
                     var hiddenUrl = document.getElementById('jpllink').value;
-                    window.open(hiddenUrl, '_blank');
+                    if (hiddenUrl === "")
+                      alert("There are no JPL Differences") 
+                    else
+                      window.open(hiddenUrl, '_blank');
                 }
             }
         ]
