@@ -12,7 +12,7 @@
             "program": "compareScreens.py",
             "console": "integratedTerminal",
             "args": [
-                "DFCT0014069",
+                "TESTSCREEN",
                 ""
             ]
         },

@@ -430,7 +430,8 @@ if defect_enh_id.startswith(enhancementsDirectoryStart):
 if defect_enh_id.startswith(defectsDirectoryStart):
     outputDir = os.path.join(outputBaseDirectory,"Defects",defect_enh_id)
 
-inputDir = inputBaseDirectory+"/"+defect_enh_id
+inputDir =  os.path.join(inputBaseDirectory,defect_enh_id)
+
 
 try:
     os.makedirs(outputDir)
@@ -507,7 +508,7 @@ for fname in files:
     html_table = html_table.replace('dataframe', 'table table-striped ')
     html_table = html_table.replace('">', '" style="width:100%">')
 
-    print (html_table)
+    #print (html_table)
     # Load the template environment
     env = Environment(loader=FileSystemLoader('./'))
     template = env.get_template('index.html')

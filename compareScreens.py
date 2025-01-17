@@ -149,9 +149,30 @@ def readScreenJPL(screenName):
                 
     return jplText
 
+def printRelevantFieldDiffLines(content1, content2):
+    
+    diffObject = difflib.Differ()
+    differences = list(diffObject.compare(content1, content2))
+    trueDiffs = []
+    
+    unique = True
+    
+    for diffLine in differences:
+
+        jplMatch = re.match(r"^[\-\+] .*", diffLine)
+        if (jplMatch):
+            #print (diffLine)
+            unique = False
+            trueDiffs.append(diffLine)
+    
+    if (unique):
+        return None
+
+    return trueDiffs
 
 
 def printRelevantDiffLines(content1, content2):
+
     diffObject = difflib.Differ()
     differences = list(diffObject.compare(content1, content2))
     trueDiffs = []
@@ -183,9 +204,10 @@ def stripExtraneousFieldLines(fieldLine):
 
     # Exclude 'LINE=[\d]+ COLUMN=[\d]+
 
-    if (re.match(r"\s+LINE=[\d]+ COLUMN=[\d]+", fieldLine)):
+    if (re.match(r"\s*LINE=[\d]+\s*COLUMN=[\d]+.*", fieldLine)):
         return None
-    
+   
+
     ## Exclude all PI lines like the following:
     # PI(voff)=18.50
     # PI(hoff)=23.00
@@ -269,11 +291,13 @@ def compareFieldsPandas(fieldSet1, fieldSet2):
         keys1Only = list(set(keys1) - set(keys2))
         keys2Only = list(set(keys2) - set(keys1))
         
-        for fieldNameS1 in iter(sorted(keys1Only)):
-            resultArr.append(["Unique Field", "".join(fieldNameS1), ""]) 
+#        for fieldNameS1 in iter(sorted(keys1Only)):
+#            resultArr.append(["Unique Field", "".join(fieldNameS1), ""]) 
 
-        for fieldNameS2 in iter(sorted(keys2Only)):
-            resultArr.append(["Unique Field", "", "".join(fieldNameS2)]) 
+#        for fieldNameS2 in iter(sorted(keys2Only)):
+#            resultArr.append(["Unique Field", "", "".join(fieldNameS2)]) 
+            
+        resultArr.append(["Unique Fields ", "\n".join(keys1Only),"\n".join(keys2Only)]) 
 #        print("Fields Only in Screen 1: " + ", ".join(keys1Only))
 #        print("Fields Only in Screen 2: " + ", ".join(keys2Only))
 #        print("")
@@ -288,7 +312,7 @@ def compareFieldsPandas(fieldSet1, fieldSet2):
 #        print("---")
         unique = False
 #        print ("Field different for: " + fieldName + "\n")
-        truediffs = printRelevantDiffLines(fieldSet1[fieldName], fieldSet2[fieldName])
+        truediffs = printRelevantFieldDiffLines(fieldSet1[fieldName], fieldSet2[fieldName])
         # truediffs will have entries - is screen1 + screen 2
         dlen = len(truediffs)
         scrn1diff = []
@@ -379,7 +403,7 @@ if defect_enh_id.startswith(enhancementsDirectoryStart):
 if defect_enh_id.startswith(defectsDirectoryStart):
     outputDir = os.path.join(outputBaseDirectory,"Defects",defect_enh_id)
 
-inputDir = inputBaseDirectory+"/"+defect_enh_id
+inputDir =  os.path.join(inputBaseDirectory,defect_enh_id)
 
 
 try:
@@ -393,6 +417,8 @@ except OSError as e:
 
 
 files = get_files_with_extension(inputDir, asciiModifiedExtension)
+# extract the .jam filename
+
 
 if screenName != "":
     # just use filename
@@ -405,8 +431,9 @@ if (len(files) == 0) :
 
 fcounter = 0
 for fname in files:
-    screenName1 = fname + asciiOriginalExtension
-    screenName2 = fname 
+    base_filename = fname.split('.jam')[0] + '.jam'
+    screenName1 = base_filename + asciiOriginalExtension
+    screenName2 = base_filename + asciiModifiedExtension 
 
     pathName1 = inputDir +'/' + screenName1
     pathName2 = inputDir +'/' + screenName2
