@@ -12,8 +12,8 @@
             "program": "compareScreens.py",
             "console": "integratedTerminal",
             "args": [
-                "TESTSCREEN",
-                ""
+                "DFCT0014069",
+                "payroll.jam"
             ]
         },
         {

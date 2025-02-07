@@ -451,7 +451,7 @@ for fname in files:
 
     pjpldiffs = compareJplPandas(jplText1, jplText2)
     if (pjpldiffs):
-        jpldiff=fname +'.jpl.html'
+        jpldiff=base_filename +'.jpl.html'
         link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
         foutpath = outputDir + "\\" + jpldiff
         compare_jpl_files(jplRawText1, jplRawText2,foutpath)
@@ -496,7 +496,7 @@ for fname in files:
     rendered_html = template.render(content=html_table,jpllink=jpldiff)
 
     # Save the rendered HTML to a file
-    with open(outputDir+'/'+ fname +'.html', 'w') as f:
+    with open(outputDir+'/'+ base_filename +'.html', 'w') as f:
         f.write(rendered_html)
 
 print("Completed Screen Compare - Files processed="+str(fcounter)+"\n")
