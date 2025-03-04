@@ -10,8 +10,6 @@ from jinja2 import Environment, FileSystemLoader
 import os
 from colorama import Fore, Back, Style
 
-
-
 if (len(sys.argv) == 2) :
     defect_enh_id =sys.argv[1]
     screenName = ""
@@ -20,7 +18,7 @@ else:
         defect_enh_id =sys.argv[1]
         screenName = sys.argv[2]
     else:
-        print("Usage: python compareScreens.py <Defect/Enhancment #> <screenname.jam>\n")
+        print("Usage: python compareScreens.py <Defect/Enhancment #> <screenname.jam>")
         print("if Screenname is blank it will compare ALL screens in directory")
         sys.exit()
 
@@ -385,8 +383,16 @@ def create_index_html(repo_path):
 config = configparser.ConfigParser()
 
 # Add a section
-config.read('config.ini')
+# Try reading the config file
+config_file = 'config.ini'
+
+if not os.path.exists(config_file):
+    print(f"The file {config_file} does not exist.")
+    exit
+
+config.read(config_file)
 #get all the ini data
+
 outputBaseDirectory = config['CompareScreen']['outputPath']
 inputBaseDirectory=config['CompareScreen']['inputBaseDirectory']
 enhancementsDirectoryStart=config['CompareScreen']['enhancementsDirectoryStart']
@@ -410,7 +416,7 @@ try:
     os.makedirs(outputDir)
 except OSError as e:
     if e.errno == 17:  # File exists
-        print("Directory already exists:", outputDir)
+        print("Output Directory already exists:", outputDir)
     else:
         print(e)
         sys.exit
