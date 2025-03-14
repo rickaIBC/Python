@@ -10,16 +10,17 @@ from jinja2 import Environment, FileSystemLoader
 import os
 from colorama import Fore, Back, Style
 
-
 if (len(sys.argv) == 3) :
     currentFile = sys.argv[1]
     modifiedFile = sys.argv[2]
     print("compareScreens will scan the ascii files for changes ansd will create a summary")
     print("of changes that can be viewed in a browser.")
+    print("The Differences Summary Files will be created in the directory this program was run.")
 else:
     print("Usage: compareScreens <Pathname to current ascii file> <Pathname to modified ascii file>")
     print("compareScreens will scan the ascii files for changes ansd will create a summary")
     print("of changes that can be viewed in a browser.")
+    print("The Differences Summary Files will be created in the directory this program was run.")
     print("If files are blank or not found it will exit.")
     sys.exit()
 
@@ -413,6 +414,17 @@ else:
     print(f"Modified Ascii File {modifiedFile} does not exist.")
     sys.exit()
 
+if getattr(sys, 'frozen', False):
+    # If the script is run as a bundled executable (e.g., with PyInstaller)
+    executable_path = sys.executable
+else:
+    # If the script is run as a standard Python script
+    executable_path = os.path.abspath(sys.argv[0])
+
+app_path = os.path.dirname(executable_path)
+#print(executable_path)
+
+
 # Split the path
 dirname1, screenName1, ext1 = split_file_name(currentFile)
 dirname2, screenName2, ext2 = split_file_name(modifiedFile)
@@ -433,7 +445,7 @@ pjpldiffs = compareJplPandas(jplText1, jplText2)
 if (pjpldiffs):
     jpldiff=screenName1 +'.jpl.diff.html'
     link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
-    foutpath = os.path.join(dirname1, jpldiff)
+    foutpath = os.path.join(jpldiff)
     compare_jpl_files(jplRawText1, jplRawText2,foutpath)
 else:
     jpldiff=""
@@ -449,7 +461,7 @@ technologies = ({
 df_technologies = pd.DataFrame(technologies)
 # Now you can transpose the technologies DataFrame (make 'Screen' column the index)
 #df_technologies.set_index('Screen', inplace=True)
-print(df_technologies)
+#print(df_technologies)
     # Array of new rows 
 new_rows = pflddiffs
 
@@ -457,10 +469,10 @@ new_rows = pflddiffs
 new_df = pd.DataFrame(new_rows, columns=df_technologies.columns)
 #new_df = pd.DataFrame(new_rows)
 #new_df.set_index('Key', inplace=True)
-print(new_df)
+#print(new_df)
 # Concatenate the two DataFrames along the columns (index alignment)
 final_df = pd.concat([df_technologies, new_df], axis=0)
-print(final_df)
+#print(final_df)
 # Replace '\n' with '<br>' in the entire DataFrame
 formatted_df = final_df.replace({'\n': '<br>'}, regex=True)
 
@@ -471,8 +483,9 @@ html_table = html_table.replace('">', '" style="width:100%">')
 
 #print (html_table)
 # Load the template environment
-env = Environment(loader=FileSystemLoader('./'))
-template = env.get_template('index.html')
+executable_path
+env = Environment(loader=FileSystemLoader(app_path))
+template = env.get_template('compare.html')
 
 # Read the content from the file
 #with open('file.txt', 'r') as f:
@@ -482,7 +495,7 @@ template = env.get_template('index.html')
 rendered_html = template.render(content=html_table,jpllink=jpldiff)
 
 # Save the rendered HTML to a file
-foutpath = os.path.join(dirname1, screenName1 + '.diff.html')
+foutpath = os.path.join(screenName1 + '.diff.html')
 
 with open(foutpath, 'w') as f:
     f.write(rendered_html)

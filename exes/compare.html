@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet"> 
+    <link href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.css" rel="stylesheet">
+ 
+    <script  src="https://code.jquery.com/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script  src=https://cdn.datatables.net/2.2.1/js/dataTables.js></script>
+    <script  src="https://cdn.datatables.net/2.2.1/js/dataTables.bootstrap5.js"></script>
+    <script  src="https://cdn.datatables.net/buttons/3.2.0/js/dataTables.buttons.js"></script>
+    <script  src="https://cdn.datatables.net/buttons/3.2.0/js/buttons.dataTables.js"></script>
+ 
+    <meta charset=utf-8 />
+    <title>Screen/ReportCompare</title>
+    <style>
+      .pre-wrap {
+          white-space: pre-wrap;
+      }
+      /* Add this CSS to allow line breaks in table cells */
+      td {
+        white-space: pre-line;
+      }
+
+  </style>
+  </head>
+  <body>
+    <div class="container">
+      {{ content }}
+    </div>
+    <input type="hidden" id="jpllink" name="jpllink" value="{{ jpllink }}">
+
+  </body>
+
+  <script>
+  var table = $('#example').DataTable({
+  layout: {
+    topStart: {
+      buttons: [
+        {
+          text: function (e, dt, node, config) {
+            var hiddenUrl = document.getElementById('jpllink').value;
+            return hiddenUrl === "" ? 'No JPL Differences' : 'JPL Link';
+          },
+          action: function (e, dt, node, config) {
+            var hiddenUrl = document.getElementById('jpllink').value;
+            if (hiddenUrl === "") {
+              alert("There are no JPL Differences");
+            } else {
+              window.open(hiddenUrl, '_blank');
+            }
+          }
+        }
+      ]
+    }
+  },
+  columns: [
+    null,
+    {
+      "createdCell": function (td, cellData, rowData, row, col) {
+        // Ensure that the data is inserted as HTML (this is crucial for <br> to work)
+        $(td).html(cellData);
+      }
+    },
+    {
+      "createdCell": function (td, cellData, rowData, row, col) {
+        // Again, set HTML content to allow <br> to render
+        $(td).html(cellData);
+      }
+    }
+  ]
+});
+
+
+
+
+    table.on('click', 'tbody tr', function () {
+        let data = table.row(this).data();
+     
+        alert('You clicked on ' + data[0] + "'s row");
+    });</script>
+</html>
