@@ -13,6 +13,16 @@
  
     <meta charset=utf-8 />
     <title>Screen/ReportCompare</title>
+    <style>
+      .pre-wrap {
+          white-space: pre-wrap;
+      }
+      /* Add this CSS to allow line breaks in table cells */
+      td {
+        white-space: pre-line;
+      }
+
+  </style>
   </head>
   <body>
     <div class="container">
@@ -24,40 +34,44 @@
 
   <script>
   var table = $('#example').DataTable({
-    layout: {
-      topStart: {
-        buttons: [
-            {
-                text: function (e, dt, node, config) {
-                        var hiddenUrl = document.getElementById('jpllink').value;
-                        return hiddenUrl === "" ? 'No JPL Differences' : 'JPL Link';
-                    },
-                action: function (e, dt, node, config) {
-                    var hiddenUrl = document.getElementById('jpllink').value;
-                    if (hiddenUrl === "")
-                      alert("There are no JPL Differences") 
-                    else
-                      window.open(hiddenUrl, '_blank');
-                }
+  layout: {
+    topStart: {
+      buttons: [
+        {
+          text: function (e, dt, node, config) {
+            var hiddenUrl = document.getElementById('jpllink').value;
+            return hiddenUrl === "" ? 'No JPL Differences' : 'JPL Link';
+          },
+          action: function (e, dt, node, config) {
+            var hiddenUrl = document.getElementById('jpllink').value;
+            if (hiddenUrl === "") {
+              alert("There are no JPL Differences");
+            } else {
+              window.open(hiddenUrl, '_blank');
             }
-        ]
+          }
+        }
+      ]
+    }
+  },
+  columns: [
+    null,
+    {
+      "createdCell": function (td, cellData, rowData, row, col) {
+        // Ensure that the data is inserted as HTML (this is crucial for <br> to work)
+        $(td).html(cellData);
       }
     },
-    columns: [
-        null,
-        null,
-        {
-            "render": function(data, type, row){
-                return data.split("\\n").join("<br/>");
-            }
-        },
-        {
-            "render": function(data, type, row){
-                return data.split("\\n").join("<br/>");
-            }
-        }
-    ]
+    {
+      "createdCell": function (td, cellData, rowData, row, col) {
+        // Again, set HTML content to allow <br> to render
+        $(td).html(cellData);
+      }
+    }
+  ]
 });
+
+
 
 
     table.on('click', 'tbody tr', function () {

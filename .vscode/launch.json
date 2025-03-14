@@ -12,8 +12,8 @@
             "program": "compareScreens.py",
             "console": "integratedTerminal",
             "args": [
-                "DFCT0014069",
-                "payroll.jam"
+                "C:\\Users\\radams\\OneDrive - DOI\\QuickTime\\RWAD\\ENHC0037153\\dis_pay_period.jam.asc.bak",
+                "C:\\Users\\radams\\OneDrive - DOI\\QuickTime\\RWAD\\ENHC0037153\\dis_pay_period.jam.asc"
             ]
         },
         {
@@ -25,6 +25,16 @@
             "args": [
                 "TESTREPORTS",
                 ""
+            ]
+        },
+        {
+            "name": "F2asc Fixup Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "fixScreenColorF2asc.py",
+            "console": "integratedTerminal",
+            "args": [
+                "test.jam.asc"
             ]
         }
     ]

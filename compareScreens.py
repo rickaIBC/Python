@@ -10,17 +10,19 @@ from jinja2 import Environment, FileSystemLoader
 import os
 from colorama import Fore, Back, Style
 
-if (len(sys.argv) == 2) :
-    defect_enh_id =sys.argv[1]
-    screenName = ""
+
+if (len(sys.argv) == 3) :
+    currentFile = sys.argv[1]
+    modifiedFile = sys.argv[2]
+    print("compareScreens will scan the ascii files for changes ansd will create a summary")
+    print("of changes that can be viewed in a browser.")
 else:
-    if (len(sys.argv) == 3) :
-        defect_enh_id =sys.argv[1]
-        screenName = sys.argv[2]
-    else:
-        print("Usage: python compareScreens.py <Defect/Enhancment #> <screenname.jam>")
-        print("if Screenname is blank it will compare ALL screens in directory")
-        sys.exit()
+    print("Usage: compareScreens <Pathname to current ascii file> <Pathname to modified ascii file>")
+    print("compareScreens will scan the ascii files for changes ansd will create a summary")
+    print("of changes that can be viewed in a browser.")
+    print("If files are blank or not found it will exit.")
+    sys.exit()
+
 
 # Uncommenting the pdb line opens the debugger in the command line
 # pdb.set_trace()
@@ -329,7 +331,7 @@ def compareFieldsPandas(fieldSet1, fieldSet2):
         
     if (unique):
         #print("No Differences in Common Fields\n")
-        resultArr.append(["Common Fields", "None", "None"]) 
+        resultArr.append(["Common Fields Diffs", "None", "None"]) 
 
     return resultArr
 
@@ -362,7 +364,7 @@ def create_index_html(repo_path):
     # Walk through the directory and add links to HTML files
     for root, dirs, files in os.walk(repo_path):
         for file in files:
-            if file.endswith(".html"):
+            if file.endswith("compared.html"):
                 relative_path = os.path.relpath(os.path.join(root, file), repo_path)
                 html_content += f'<li><a href="{relative_path}" target="_blank">{relative_path}</a></li>\n'
     
@@ -374,141 +376,121 @@ def create_index_html(repo_path):
     """
     
     # Write the HTML content to index.html
-    with open(os.path.join(repo_path, "index.html"), "w") as f:
+    with open(os.path.join(repo_path, "compared.index.html"), "w") as f:
         f.write(html_content)
-    print("index.html file has been created successfully!")
+    print("compared.index.html file has been created successfully!")
+
+def split_file_name(file_path):
+    """
+    Splits a file path into directory, name, and extension(s).
+
+    Args:
+        file_path: The full path to the file.
+
+    Returns:
+        A tuple containing:
+          - directory: The directory path.
+          - name: The name of the file without extension(s).
+          - extensions: The extension(s) of the file.
+    """
+    directory, file_name = os.path.split(file_path)
+    name, *extensions_list = file_name.split(".")
+    extensions = "." + ".".join(extensions_list) if extensions_list else ""
+    return directory, name, extensions
 
 # ---------------------------------------------------------------------------------------
 # PROGRAM START (after def's and variables above)
-config = configparser.ConfigParser()
 
-# Add a section
-# Try reading the config file
-config_file = 'config.ini'
+if os.path.exists(currentFile):
+    print(f"Processing Current Ascii File {currentFile} .")
+else:
+    print(f"Current Ascii File {currentFile} does not exist.")
+    sys.exit()
 
-if not os.path.exists(config_file):
-    print(f"The file {config_file} does not exist.")
-    exit
+if os.path.exists(modifiedFile):
+    print(f"Processing Modified Ascii File {modifiedFile} .")
+else:
+    print(f"Modified Ascii File {modifiedFile} does not exist.")
+    sys.exit()
 
-config.read(config_file)
-#get all the ini data
+# Split the path
+dirname1, screenName1, ext1 = split_file_name(currentFile)
+dirname2, screenName2, ext2 = split_file_name(modifiedFile)
 
-outputBaseDirectory = config['CompareScreen']['outputPath']
-inputBaseDirectory=config['CompareScreen']['inputBaseDirectory']
-enhancementsDirectoryStart=config['CompareScreen']['enhancementsDirectoryStart']
-defectsDirectoryStart=config['CompareScreen']['defectsDirectoryStart']
+if (screenName1 != screenName2) :
+    print(f"Screen names are different {screenName1} -- {screenName2}.")
+    sys.exit()
 
-asciiOriginalExtension=config['CompareScreen']['asciiOriginalExtension']
-asciiModifiedExtension=config['CompareScreen']['asciiModifiedExtension']
+jplText1, fieldSet1 = readScreen(currentFile)
+jplText2, fieldSet2 = readScreen(modifiedFile)
 
-# Create the docs directory if its Enhancement or Defect
-if defect_enh_id.startswith("TEST"):
-    outputDir = os.path.join(outputBaseDirectory,"Testing",defect_enh_id)
-if defect_enh_id.startswith(enhancementsDirectoryStart):
-    outputDir = os.path.join(outputBaseDirectory,"Enhancements",defect_enh_id)
-if defect_enh_id.startswith(defectsDirectoryStart):
-    outputDir = os.path.join(outputBaseDirectory,"Defects",defect_enh_id)
+jpldata = [[ str(len(jplText1)),str(len(jplText2))]]
+flddata = [[ str(len(fieldSet1)),str(len(fieldSet2))]]
+jplRawText1 = readScreenJPL(currentFile)
+jplRawText2 = readScreenJPL(modifiedFile)
 
-inputDir =  os.path.join(inputBaseDirectory,defect_enh_id)
+pjpldiffs = compareJplPandas(jplText1, jplText2)
+if (pjpldiffs):
+    jpldiff=screenName1 +'.jpl.diff.html'
+    link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
+    foutpath = os.path.join(dirname1, jpldiff)
+    compare_jpl_files(jplRawText1, jplRawText2,foutpath)
+else:
+    jpldiff=""
 
+pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
 
-try:
-    os.makedirs(outputDir)
-except OSError as e:
-    if e.errno == 17:  # File exists
-        print("Output Directory already exists:", outputDir)
-    else:
-        print(e)
-        sys.exit
-
-
-files = get_files_with_extension(inputDir, asciiModifiedExtension)
-# extract the .jam filename
-
-
-if screenName != "":
-    # just use filename
-    files = [screenName + asciiModifiedExtension]
-    # do the loop
-
-if (len(files) == 0) :
-    print(Fore.RED + "No Screen Files to compare!" + Style.RESET_ALL)
-    sys.exit
-
-fcounter = 0
-for fname in files:
-    base_filename = fname.split('.jam')[0] + '.jam'
-    screenName1 = base_filename + asciiOriginalExtension
-    screenName2 = base_filename + asciiModifiedExtension 
-
-    pathName1 = inputDir +'/' + screenName1
-    pathName2 = inputDir +'/' + screenName2
-    # check if files exist if not ignore them.
-    if not os.path.exists(pathName1) and os.path.exists(pathName2):
-        print(Fore.RED + "No ASCII Files to compare! ",pathName1," : " , pathName2 + Style.RESET_ALL)
-        continue
-    fcounter+= 1
-    jplText1, fieldSet1 = readScreen(pathName1)
-    jplText2, fieldSet2 = readScreen(pathName2)
-    jpldata = [[ str(len(jplText1)),str(len(jplText2))]]
-    flddata = [[ str(len(fieldSet1)),str(len(fieldSet2))]]
-    jplRawText1 = readScreenJPL(pathName1)
-    jplRawText2 = readScreenJPL(pathName2)
-
-    pjpldiffs = compareJplPandas(jplText1, jplText2)
-    if (pjpldiffs):
-        jpldiff=base_filename +'.jpl.html'
-        link = "<a href=\"" + jpldiff +"\" target=\"_blank\">"+jpldiff+"</a>"
-        foutpath = outputDir + "\\" + jpldiff
-        compare_jpl_files(jplRawText1, jplRawText2,foutpath)
-    else:
-        jpldiff=""
-    
-  
-    pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
-
-    newflddata = pflddiffs[0]
-    technologies = ({
-        'Screen':["JPL Lines","Num Fields"],
-        screenName1 :[str(len(jplText1)),str(len(fieldSet1))],
-        screenName2 :[str(len(jplText2)),str(len(fieldSet1))]
-                })
-    df = pd.DataFrame(technologies)
-
+newflddata = pflddiffs[0]
+technologies = ({
+    'Screen':["JPL Lines","Num Fields"],
+    screenName1+ext1:[str(len(jplText1)),str(len(fieldSet1))],
+    screenName2+ext2:[str(len(jplText2)),str(len(fieldSet2))]
+    })
+df_technologies = pd.DataFrame(technologies)
+# Now you can transpose the technologies DataFrame (make 'Screen' column the index)
+#df_technologies.set_index('Screen', inplace=True)
+print(df_technologies)
     # Array of new rows 
-    new_rows = pflddiffs
+new_rows = pflddiffs
 
     # Create a DataFrame from the new rows
-    new_df = pd.DataFrame(new_rows, columns=df.columns)
+new_df = pd.DataFrame(new_rows, columns=df_technologies.columns)
+#new_df = pd.DataFrame(new_rows)
+#new_df.set_index('Key', inplace=True)
+print(new_df)
+# Concatenate the two DataFrames along the columns (index alignment)
+final_df = pd.concat([df_technologies, new_df], axis=0)
+print(final_df)
+# Replace '\n' with '<br>' in the entire DataFrame
+formatted_df = final_df.replace({'\n': '<br>'}, regex=True)
 
-    # Concatenate the two DataFrames
-    df = pd.concat([df, new_df], ignore_index=True)
+html_table = formatted_df.to_html(index=False,escape=False)
+html_table = html_table.replace('<table ', '<table id="example" ')
+html_table = html_table.replace('dataframe', 'table table-striped ')
+html_table = html_table.replace('">', '" style="width:100%">')
 
-    html_table = df.to_html(index=True)
-    html_table = html_table.replace('<table ', '<table id="example" ')
-    html_table = html_table.replace('dataframe', 'table table-striped ')
-    html_table = html_table.replace('">', '" style="width:100%">')
+#print (html_table)
+# Load the template environment
+env = Environment(loader=FileSystemLoader('./'))
+template = env.get_template('index.html')
 
-    #print (html_table)
-    # Load the template environment
-    env = Environment(loader=FileSystemLoader('./'))
-    template = env.get_template('index.html')
+# Read the content from the file
+#with open('file.txt', 'r') as f:
+#    file_content = f.read()
 
-    # Read the content from the file
-    #with open('file.txt', 'r') as f:
-    #    file_content = f.read()
+# Render the template with the file content
+rendered_html = template.render(content=html_table,jpllink=jpldiff)
 
-    # Render the template with the file content
-    rendered_html = template.render(content=html_table,jpllink=jpldiff)
+# Save the rendered HTML to a file
+foutpath = os.path.join(dirname1, screenName1 + '.diff.html')
 
-    # Save the rendered HTML to a file
-    with open(outputDir+'/'+ base_filename +'.html', 'w') as f:
-        f.write(rendered_html)
+with open(foutpath, 'w') as f:
+    f.write(rendered_html)
 
-print("Completed Screen Compare - Files processed="+str(fcounter)+"\n")
+print("Completed Screen Compare - "+screenName1)
 
 # Usage
-create_index_html(outputDir)
+#create_index_html(dirname1)
 
 
 
