@@ -2,3 +2,8 @@ dist/
 build/
 fixScreenColorF2asc.spec
 compareScreens.spec
+dis_pay_period.diff.html
+dis_pay_period.jpl.diff.html
+emp_welcome_email.diff.html
+emp_welcome_email.jam.asc
+emp_welcome_email.jam.bak
