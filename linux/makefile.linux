@@ -1,0 +1,535 @@
+# @(#)makeunix.in	77.33 00/04/25 12:52:40
+
+#
+#/*************************************/
+#/*  Copyright  (C)  1994 - 2000      */
+#/*           by                      */
+#/*  JYACC, Incorporated              */
+#/*  New York, New York               */
+#/*  All Rights Reserved              */
+#/*  Printed in U.S.A.                */
+#/*  Property of JYACC, Incorporated  */
+#/*************************************/
+#
+# /********************************************************************************************/
+# /* Modifications:                                                                           */
+# /*   2013.06.27   CR20130085   E. Ramos                                                     */
+# /*                Included modifications to compile executables for Quicktime on Linux.     */
+# /*   2013.08.16   PR20130427   E. Ramos                                                     */
+# /*                Prevent javascript error due to undefined __pushed__ form field.          */
+# /*   2014.03.18   PR20140119   E. Ramos                                                     */
+# /*                Integrated patch (web.o) for XSS vulnerability (OPR#140318-001).          */
+# /*   2014.06.23   PR20140337   E. Ramos (rework)                                            */
+# /*                Integrate patch for bugsy #36497 (semicolons at the end of SQL statements)*/
+# /*   2015.01.05   PR20140654   E. Ramos                                                     */
+# /*                Integrate patch for bugsy #38514 (include ALT text also in TITLE property */
+# /*   2017.10.18   CR20170088   E. Ramos                                                     */
+# /*                Integrate patch for bugsy #38501 and changes made to support the code     */
+# /*                RW_DRV_BLANK introduced to support the new CSV driver: rwdrvcsv.o         */
+# /*   2020.11.02   DFCT0011932  E. Ramos                                                     */
+# /*                Link jserver with wbrstrt.o (patch for bugsy #38635) in front of libweb.a */
+# /*   2022.09.14   ENHC0036672  E. Ramos                                                     */
+# /*                Add template.o to WEBPATCHMODS                                            */
+# /*                (now building with 39043)                                                 */
+# /*   2022.09.21   ENHC0036663  J. Grossman                                                  */
+# /*                Add 'makehist' functionality in jserver build, remove template.o          */
+# /*                (revert from 39043 to 39042)                                              */
+# /*   2022.10.19   ENHC0036663  J. Grossman                                                  */
+# /*                restore template.o                                                        */
+# /*                (now building with 39043)                                                 */
+# /*   2022.10.26   ENHC0036663  J. Grossman                                                  */
+# /*                mods updates                                                              */
+# /*                (now building with 39043)                                                 */
+# /*   2022.11.15   ENHC0036664  J. Grossman                                                  */
+# /*                mods updates                                                              */
+# /*                (now building with 37109)                                                 */
+# /*   2023.03.30   ENHC00?????  J. Grossman                                                  */
+# /*                mods updates                                                              */
+# /*                (now building with 38742)                                                 */
+# /*   2024.12.11   ENHC00?????  J. Grossman                                                  */
+# /*                mods updates                                                              */
+# /*                (now building with 39157)                                                 */
+# /*   2025.01.02   migration  J. Grossman                                                    */
+# /*                new servers means new glibc which has a bug that makes its headers         */
+# /*                indigestible to the Oracle precompiler, so alter the precompiler config   */
+# /*                file to point to a set of fake headers in order to pacify Pro*C (which    */
+# /*                doesn't even use them but has to parse them) (yes, there exists a patch   */
+# /*                for Oracle and a patch for gcc but this is quicker and maybe better)      */
+# /*                (now building with 37109)                                                 */
+# /********************************************************************************************/
+#   This makefile can build:
+#	prorun       - Prolifics executable for unix
+#	prodev       - Prolifics executable with editor & debugger for unix
+#	rwrun        - Prolifics report generator for unix
+#	jserver	     - Prolifics Web server for unix
+#   This makefile can also build the following Quicktime file on Linux:
+#       qtc.so       - The shared object used to make C functions available to the EJB code.
+#       pass2        - The command-line utility to encode/decode passwords.
+#
+# Uncomment the products you want to build.
+PRORUN        = prorun
+PRODEV        = prodev
+RWRUN         = rwrun
+JSERVER       = jserver
+
+all:	\
+	checkdbvars \
+	$(JSERVER) \
+	qtc.so \
+	pass2
+
+# Add your source modules here
+
+SRCMODS = funclist.o base64.o genpaswd.o ut_functions.o ut_log_hook.o ldb_globals.o libz.a 
+SRCMODSCM = funclistcm.o base64.o genpaswd.o ut_functions.o ut_log_hook.o  ldb_globals.o webcache.o libz.a
+RWMODS = rwarea.o rwdev.o rwdriver.o rwdrvcsv.o rwform.o rwwidget.o  
+WEBPATCHMODS = genjava.o genhtml.o web.o jplcomp.o smweb.o template.o webrstrt.o
+RWRUN_SRCMODS = qt_dummy_funcs.o funclist.o ut_functions.o genpaswd.o ut_log_hook.o ldb_globals.o base64.o
+
+base64.o: base64.c
+	$(CC) -std=gnu99 -g -o base64.o -c base64.c
+genpaswd.o: genpaswd.c
+	$(CC) -std=gnu99 -g -o genpaswd.o -c genpaswd.c
+pass2.o: pass2.c
+	$(CC) -std=gnu99 -g -o pass2.o -c pass2.c 
+ut_log_hook_REENTRANT.o: ut_log_hook.c
+	$(QTC_SO_CC) -c ut_log_hook.c -o ut_log_hook_REENTRANT.o
+base64_REENTRANT.o: base64.c
+	$(QTC_SO_CC) -c base64.c -o base64_REENTRANT.o
+genpaswd_REENTRANT.o: genpaswd.c
+	$(QTC_SO_CC) -c genpaswd.c -o genpaswd_REENTRANT.o
+ut_functions_REENTRANT.o: ut_functions.c
+	$(QTC_SO_CC) -c ut_functions.c -o ut_functions_REENTRANT.o
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS PARAMETERS				#
+#-----------------------------------------------------------------------#
+
+# To override the value of an environment variable, uncomment its
+# definition below
+SMBASE = /qt/prolifics
+# MOTIFLIB = 
+# MOTIFINC = /
+# JAVA_HOME =
+
+#-----------------------------------------------------------------------#
+#			MOTIF PARAMETERS				#
+# If you do not wish to use MOTIF, comment the following lines		#
+#-----------------------------------------------------------------------#
+
+# PIMOD = piinit.o
+# PIDEVMOD = pijxinit.o
+# PILIBS = $(SMBASE)/lib/libpixm.a $(SMBASE)/lib/libpi.a
+# PICFLAGS = -I$(MOTIFINC) -DSM_MOTIF -DSM_PI -DMENUS=1
+# PILDFLAGS = -L$(MOTIFLIB)
+# PIMOTIF = motiflib motifinc
+
+# use PLAT_PIM_SHA_LIBFLAGS for sharable libraries (if supported)
+# use PLAT_PIM_ARC_LIBFLAGS for regular archive libraries
+# PLAT_PIM_DEF_LIBFLAGS is set to a platform-specific default
+
+#PLAT_PIM_LIBFLAGS = $(PLAT_PIM_SHA_LIBFLAGS)
+#PLAT_PIM_LIBFLAGS = $(PLAT_PIM_ARC_LIBFLAGS)
+PLAT_PIM_LIBFLAGS = $(PLAT_PIM_DEF_LIBFLAGS)
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS WEB PARAMETERS			#
+# If you do not wish to use PROLIFICS WEB features, comment the		#
+# following lines							#
+#-----------------------------------------------------------------------#
+
+WEBBASE = $(SMBASE)
+WEBINCLUDE = -I$(WEBBASE)/include
+WEBLIB = $(SMBASE)/lib/libwebdv.a
+WEBSRVLIB = $(WEBBASE)/lib/libweb.a
+WEBCFLAGS = -DSM_WEB
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS/DEBUGGER PARAMETERS			#
+# If you do not wish to use PROLIFICS/DEBUGGER, comment the following	#
+# lines									#
+#-----------------------------------------------------------------------#
+
+DEBUGMOD = smdbinit.o
+DEBUGLIB = $(SMBASE)/lib/libsmdb.a
+# -DMENUS necessary for debugger
+DEBUGFLAGS = -DSM_DEBUG=1 -DMENUS=1 -DDBIDEBUG=1
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS DATABASE PARAMETERS			#
+#									#
+# If you do not wish to use a PROLIFICS database driver, comment out	#
+# the following lines.							#
+#-----------------------------------------------------------------------#
+
+DBIBASE = $(SMBASE)
+DBILIBS = $(DBIBASE)/lib/libtm.a $(DBIBASE)/lib/libdm.a
+DBICFLAGS = -DDBI=2
+DBIMOD = dbiinit.o
+
+#-----------------------------------------------------------------------#
+#			SELECT DATABASE SOFTWARE			#
+# To choose databases to link with PROLIFICS, first uncomment the	#
+# corresponding database sections below.  Second, edit the		#
+# uncommented files (makevars.{dbms}) to choose the correct versions	#
+# of the database software.						#
+#-----------------------------------------------------------------------#
+
+# For databases selected below, verify the corresponding make.<db> files to
+# ensure that appropriate sections are uncommented.
+
+# If not using JDB, comment out the following line.
+# include makevars.jdb
+
+# If using ALLBASE, uncomment the following line.
+#include makevars.alb
+
+# If using DB2, uncomment the following line.
+#include makevars.db2
+
+# If using INFORMIX, uncomment the following line.
+#include makevars.inf
+
+# If using INGRES, uncomment the following line.
+#include makevars.ing
+
+# If using INTERBASE, uncomment the following line.
+#include makevars.int
+
+# If using ODBC, uncomment the following line.
+#include makevars.odb
+
+# If using ORACLE, uncomment the following line.
+include makevars.ora
+
+# If using PROGRESS, uncomment the following line.
+#include makevars.pro
+
+# If using SYBASE, uncomment the following line.
+#include makevars.syb
+
+
+
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS WEBSPHERE PARAMETERS			#
+#									#
+# If you do not wish to use PROLIFICS WebSphere features, comment the	#
+# lines below.								#
+#-----------------------------------------------------------------------#
+EJBCFLAGS = -DSM_EJB=1
+EJBLDFLAGS = $(EJB_LDFLAGS)
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS JAVA PARAMETERS			#
+#									#
+# If you do not wish to use PROLIFICS Java features, comment the	#
+# lines below.								#
+#-----------------------------------------------------------------------#
+JAVACFLAGS = -DSM_JAVA=1
+JAVALDFLAGS = $(JAVA_LDFLAGS)
+
+#-----------------------------------------------------------------------#
+#			PROLIFICS REPORT WRITER PARAMETERS		#
+#									#
+# If you do not wish to use PROLIFICS Report Writer features, comment	#
+# the lines below.							#
+#-----------------------------------------------------------------------#
+RWCFLAGS = -DSM_RW=1
+RWLIB = $(SMBASE)/lib/librw.a
+RW_LIBFLAGS = $(RW_GRAPH_LIBS)
+
+#-----------------------------------------------------------------------#
+#			END OF USER MODIFIABLE SECTION			#
+#-----------------------------------------------------------------------#
+
+#-----------------------------------------------------------------------#
+#			COMPILER PARAMETERS				#
+#-----------------------------------------------------------------------#
+
+MKINITARGS = $(ALB_INITARG) $(DB2_INITARG) $(INF_INITARG) \
+	$(ING_INITARG) $(INT_INITARG) $(ODB_INITARG) $(ORA_INITARG) \
+	$(PRO_INITARG) $(SYB_INITARG) $(JDB_INITARG)
+
+include $(SMBASE)/include/makevars.inc
+
+# Include path for C compiler
+DBSINCLUDE = $(JDBINCLUDE) $(ALBINCLUDE) $(DB2INCLUDE) $(INFINCLUDE) \
+	$(INGINCLUDE) $(INTINCLUDE) $(ODBINCLUDE) $(ORAINCLUDE) \
+	$(PROINCLUDE) $(SYBINCLUDE)
+CCINCLUDE = -I$(SMBASE)/include $(DBSINCLUDE) $(WEBINCLUDE)
+
+# Platform specific libraries.
+MACHLIBS = $(PLAT_PIM_LIBFLAGS) $(PLAT_LIBFLAGS)
+SRVMACHLIBS = $(RW_GRAPH_LIBS) $(PLAT_LIBFLAGS)
+
+BATCH_CFLAGS = $(PLAT_CFLAGS) $(PLAT_PICFLAGS) -D$(PLAT_NAME) -DMENUS=1 \
+	-DMENU6=1 -DUSE_MOUSE=1 $(CCINCLUDE) $(DBICFLAGS) \
+	$(WEBCFLAGS) $(RWCFLAGS) $(DEBUGFLAGS) $(CACFLAGS) \
+	$(EJBCFLAGS) \
+	$(JAVACFLAGS)
+
+CFLAGS = $(BATCH_CFLAGS) $(PICFLAGS)
+
+LDFLAGS = $(PLAT_LDFLAGS) $(PLAT_PILDFLAGS) $(PILDFLAGS) \
+	$(EJBLDFLAGS) \
+	$(JAVALDFLAGS)
+LD = $(CC)
+
+SRVLDFLAGS = $(PLAT_LDFLAGS) $(JAVALDFLAGS)
+
+DBISUPMODS = $(JDBSUPMODS) $(ALBSUPMODS) $(DB2SUPMODS) $(INFSUPMODS) \
+	$(INGSUPMODS) $(INTSUPMODS) $(ODBSUPMODS) $(ORASUPMODS) \
+	$(PROSUPMODS) $(SYBSUPMODS)
+
+DBISUPLIBS = $(JDBSUPLIB) $(ALBSUPLIB) $(DB2SUPLIB) $(INFSUPLIB) \
+	$(INGSUPLIB) $(INTSUPLIB) $(ODBSUPLIB) $(ORASUPLIB) \
+	$(PROSUPLIB) $(SYBSUPLIB)
+
+DBSLIBS = $(JDBLIBS) $(ALBLIBS) $(DB2LIBS) $(INFLIBS) \
+	$(INGLIBS) $(INTLIBS) $(ODBLIBS) $(ORALIBS) \
+	$(PROLIBS) $(SYBLIBS)
+
+PROLLIB = \
+	$(SMBASE)/lib/libent.a \
+	$(SMBASE)/lib/libsm.a
+
+JXLIBS = \
+	$(SMBASE)/lib/libjx.a \
+	$(PROLLIB)
+
+# Default rule to compile C source
+.c.o:
+	$(CC) $(CFLAGS) -c $<
+
+#-----------------------------------------------------------------------#
+#			COMMANDS TO BUILD EXECUTABLES			#
+#-----------------------------------------------------------------------#
+
+checkdbvars:
+
+motiflib:
+	@if [ '$(MOTIFLIB)' = '' ] ;\
+	then	echo "" ; \
+		echo "Error: You must define MOTIFLIB." ; \
+		echo "" ; \
+		exit 1 ; \
+	else	: ; \
+	fi
+
+motifinc:
+	@if [ '$(MOTIFINC)' = '' ] ;\
+	then	echo "" ; \
+		echo "Error: You must define MOTIFINC." ; \
+		echo "" ; \
+		exit 1 ; \
+	else	: ; \
+	fi
+
+clean:
+	rm -f jxmain.o jmain.o funclist.o funclistcm.o dbiinit.o dbiinit.c \
+	rwmain.o piinit.o pijxinit.o smdbinit.o xfunclst.o webcache.o webcache.c \
+	ut_log_hook_REENTRANT.o pass2.o genpaswd.o base64.o 
+
+webcache.c: webcache.pc
+	proc config=/qt/prolifics/link.qt/pcsfake.cfg iname=webcache
+
+webcache.o: webcache.c
+	gcc -march=x86-64 -g  -DLINUX_X86_64 -DMENUS=1 -DMENU6=1 -DUSE_MOUSE=1 -I/qt/prolifics/include        -I$(ORACLE_HOME)/rdbms/public  -I$(SMBASE)/include -DDBI=2 -DSM_WEB -DSM_RW=1 -DSM_DEBUG=1 -DMENUS=1 -DDBIDEBUG=1  -DSM_EJB=1 -DSM_JAVA=1  -c webcache.c -o webcache.o
+
+rwarea.o  rwdev.o  rwdriver.o  rwdrvcsv.o rwform.o  rwmain.o  rwwidget.o:
+	cp $(SMBASE)/rw/lib/$@ .
+
+jmain.c jxmain.c rwmain.c xfunclst.c funclist.c \
+piinit.c pijxinit.c smdbinit.c:
+	cp $(SMBASE)/link/$@ .
+
+jweb.c:
+	cp $(WEBBASE)/link/$@ .
+
+jweb.o: jweb.c
+	rm -f $@
+	$(CC) $(BATCH_CFLAGS) -c $<
+
+dbiinit.c: $(DBIBASE)/util/mkinit makefile
+	$(DBIBASE)/util/mkinit -out=$@ $(MKINITARGS)
+
+dbiinit.o: dbiinit.c
+	rm -f $@
+	$(CC) $(BATCH_CFLAGS) -c $<
+
+
+jmain.o:	jmain.c
+	rm -f $@
+	$(CC) $(CFLAGS) -c $<
+
+jxmain.o:	jxmain.c
+	rm -f $@
+	$(CC) $(CFLAGS) -c $<
+
+rwmain.o:	rwmain.c
+	rm -f $@
+	$(CC) $(BATCH_CFLAGS) -c $<
+
+
+#	rm -f $@
+#	cp funclist.c funclistcm.c
+#	$(CC) $(BATCH_CFLAGS) -c funclistcm.c
+
+prodev: \
+		$(PIMOTIF) \
+		jxmain.o \
+		xfunclst.o \
+		$(PIDEVMOD) \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(DEBUGMOD) \
+		$(SRCMODS) \
+		$(RWLIB) \
+		$(DBISUPLIBS) \
+		$(DBILIBS) \
+		$(WEBLIB) \
+		$(DEBUGLIB) \
+		$(PILIBS) \
+		$(JXLIBS)
+#
+# preparing prodev
+#
+	$(LD) $(LDFLAGS) -o $@ \
+		jxmain.o \
+		xfunclst.o \
+		$(PIDEVMOD) \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(DEBUGMOD) \
+		$(SRCMODS) \
+		$(RWLIB) \
+		$(DBISUPLIBS) \
+		$(DBILIBS) \
+		$(DBSLIBS) \
+		$(WEBLIB) \
+		$(DEBUGLIB) \
+		$(PILIBS) \
+		$(JXLIBS) \
+		$(MACHLIBS) \
+		$(RW_LIBFLAGS) \
+		-lm
+
+prorun: \
+		$(PIMOTIF) \
+		jmain.o \
+		$(PIMOD) \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(SRCMODS) \
+		$(RWLIB) \
+		$(DBISUPLIBS) \
+		$(DBILIBS) \
+		$(WEBLIB) \
+		$(PILIBS) \
+		$(PROLLIB)
+#
+# preparing prorun
+#
+	$(LD) $(LDFLAGS) -o $@ \
+		jmain.o \
+		$(PIMOD) \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(SRCMODS) \
+		$(RWLIB) \
+		$(DBISUPLIBS) \
+		$(DBILIBS) \
+		$(DBSLIBS) \
+		$(WEBLIB) \
+		$(PILIBS) \
+		$(PROLLIB) \
+		$(MACHLIBS) \
+		$(RW_LIBFLAGS) \
+		-lm
+
+rwrun:	\
+		rwmain.o \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(RWRUN_SRCMODS) \
+		$(RWMODS) \
+		$(RWLIB) \
+		$(DBILIBS) \
+		$(DBISUPLIBS) \
+		$(PROLLIB) 
+
+#
+#	Preparing rwrun
+#
+	$(LD) -o $@ \
+		rwmain.o \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(RWRUN_SRCMODS) \
+		$(RWMODS) \
+		$(RWLIB) \
+		$(DBILIBS) \
+		$(DBISUPLIBS) \
+		$(DBSLIBS) \
+		$(PROLLIB) \
+		$(PLAT_LIBFLAGS) \
+		$(RW_LIBFLAGS) \
+		-lm
+
+jserver: \
+		jweb.o \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(RWMODS) \
+		$(SRCMODSCM) \
+		$(RWLIB) \
+		$(DBISUPLIBS) \
+		$(DBILIBS) \
+		$(WEBSRVLIB) \
+		$(PROLLIB)
+#
+#	Preparing jserver
+#
+	@declare FIN=".makehist/.build_"$$(date +%s); \
+	./makehist.sh $$FIN $(WEBPATCHMODS); \
+	cat $$FIN; 
+	@read -e -n 1 -p "Is this OK? (y/n) " GOAHEAD; \
+	if [ "$$GOAHEAD" != "y" ]; then exit 1; fi 
+	echo "Continue to build" 
+	$(LD) $(SRVLDFLAGS) -o $@ \
+		jweb.o \
+		$(DBIMOD) \
+		$(DBISUPMODS) \
+		$(RWMODS) \
+		$(SRCMODSCM) \
+		$(WEBPATCHMODS) \
+		$(RWLIB) \
+		$(DBISUPLIBS) \
+		$(DBILIBS) \
+		$(WEBSRVLIB) \
+		$(DBSLIBS) \
+		$(PROLLIB) \
+		$(SRVMACHLIBS) \
+		-lm \
+		$(PTHREAD_LDFLAGS)
+
+pass2: qtconst.h pass2.o genpaswd.o base64.o
+	rm -f $@
+	$(CC) $(LDFLAGS) -std=gnu99 -o pass2 pass2.o genpaswd.o base64.o
+	chmod a+x pass2
+
+QTC_SO_OBJS = base64_REENTRANT.o genpaswd_REENTRANT.o ut_functions_REENTRANT.o ut_log_hook_REENTRANT.o
+
+QTC_SO_CC       = gcc -march=x86-64 -shared -fPIC -I$(SMBASE)/include -DLINUX_X86_64 -DCOMPILING_WITH_JAM -std=gnu99 -D_REENTRANT -L$(SMBASE)/lib -DDBI=2 -DSM_WEB -DSM_RW=1 -DSM_DEBUG=1 -DMENUS=1 -DDBIDEBUG=1  -DSM_EJB=1 -DSM_JAVA=1 -I/usr/dt/include -DSM_MOTIF -DSM_PI -DMENUS=1 -DGETTIMEOFDAY
+
+QTC_SO_LDFLAGS = -lPanSmEJB -lPanDmEJB -lpthread
+
+qtc.so: $(QTC_SO_OBJS)
+	$(QTC_SO_CC) $(QTC_SO_LDFLAGS) -o qtc.so $(QTC_SO_OBJS)
+
+memtest: memtest.o
+	rm -f $@
+	$(CC) $(LDFLAGS) -o memtest memtest.c
+	chmod a+x memtest
+

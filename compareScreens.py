@@ -455,8 +455,8 @@ pflddiffs = compareFieldsPandas(fieldSet1, fieldSet2)
 newflddata = pflddiffs[0]
 technologies = ({
     'Screen':["JPL Lines","Num Fields"],
-    screenName1+ext1:[str(len(jplText1)),str(len(fieldSet1))],
-    screenName2+ext2:[str(len(jplText2)),str(len(fieldSet2))]
+    screenName1+"_1":[str(len(jplText1)),str(len(fieldSet1))],
+    screenName2+"_2":[str(len(jplText2)),str(len(fieldSet2))]
     })
 df_technologies = pd.DataFrame(technologies)
 # Now you can transpose the technologies DataFrame (make 'Screen' column the index)

@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         
         {
             "name": "Screen Python Debugger: Current File with Arguments",
@@ -12,8 +13,8 @@
             "program": "compareScreens.py",
             "console": "integratedTerminal",
             "args": [
-                "C:\\Users\\radams\\OneDrive - DOI\\QuickTime\\RWAD\\ENHC0037153\\dis_pay_period.jam.asc.bak",
-                "C:\\Users\\radams\\OneDrive - DOI\\QuickTime\\RWAD\\ENHC0037153\\dis_pay_period.jam.asc"
+                "payroll.jam.asc",
+                "payroll.jam.asc"
             ]
         },
         {

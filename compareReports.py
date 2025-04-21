@@ -489,8 +489,8 @@ for fname in files:
     newflddata = pflddiffs[0]
     technologies = ({
         'Screen':["JPL Lines","Num Fields","REPORT Script"],
-        screenName1 :[str(len(jplText1)),str(len(fieldSet1)),prptdiffs[1]],
-        screenName2 :[str(len(jplText2)),str(len(fieldSet1)),prptdiffs[2]]
+        screenName1+"_1" :[str(len(jplText1)),str(len(fieldSet1)),prptdiffs[1]],
+        screenName2+"_2" :[str(len(jplText2)),str(len(fieldSet1)),prptdiffs[2]]
                 })
     df = pd.DataFrame(technologies)
 
